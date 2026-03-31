@@ -6,6 +6,7 @@ import { FeedbackForm } from "./feedback-form";
 import { apiRequest } from "../lib/api";
 
 type StoredUser = {
+  id: string;
   email: string;
   name: string;
   role: string;
@@ -14,12 +15,25 @@ type StoredUser = {
 type MyFeedbackItem = {
   id: string;
   title: string;
+  description: string;
   category: string;
   status: string;
   ai_summary: string;
   submittedByEmail: string;
   createdAt: string;
 };
+
+function statusTagClass(status: string) {
+  if (status === "Resolved") {
+    return "status-pill solved";
+  }
+
+  if (status === "In Review") {
+    return "status-pill reviewed";
+  }
+
+  return "status-pill sent";
+}
 
 const userStorageKey = "feedpulse-user";
 
@@ -49,7 +63,21 @@ export function HomeShell() {
 
     void fetchMine();
 
-    const handleRefresh = () => {
+    const handleRefresh = (event: Event) => {
+      const customEvent = event as CustomEvent<MyFeedbackItem | undefined>;
+      const submittedItem = customEvent.detail;
+
+      if (submittedItem) {
+        setItems((current) => {
+          const exists = current.some((item) => item.id === submittedItem.id);
+          if (exists) {
+            return current;
+          }
+
+          return [submittedItem, ...current];
+        });
+      }
+
       void fetchMine();
     };
 
@@ -157,9 +185,15 @@ export function HomeShell() {
             {items.length ? (
               items.map((item) => (
                 <article key={item.id} className="panel my-feedback-card">
-                  <span className="pill small-pill">{item.category}</span>
+                  <div className="my-feedback-top">
+                    <span className="pill small-pill">{item.category}</span>
+                    <span className={statusTagClass(item.status)}>
+                      {item.status === "Resolved" ? "Solved" : item.status === "In Review" ? "Reviewed" : "Sent"}
+                    </span>
+                  </div>
                   <h3>{item.title}</h3>
-                  <p>{item.ai_summary || "AI summary will appear after processing."}</p>
+                  <p>{item.description}</p>
+                  {item.ai_summary ? <div className="feedback-ai-note">AI: {item.ai_summary}</div> : null}
                   <div className="submitted-account">
                     Stored under: {item.submittedByEmail || user.email}
                   </div>

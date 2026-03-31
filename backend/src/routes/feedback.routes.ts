@@ -5,6 +5,7 @@ import {
   getFeedbackList,
   getMyFeedback,
   getFeedbackSummary,
+  retriggerFeedbackAnalysis,
   restoreFeedback,
   submitFeedback,
   updateFeedbackStatus
@@ -82,6 +83,26 @@ router.get("/summary", requireAdmin, getFeedbackSummary);
  *         description: Feedback fetched
  */
 router.get("/", requireAdmin, getFeedbackList);
+/**
+ * @openapi
+ * /api/feedback/{id}/reanalyze:
+ *   post:
+ *     tags:
+ *       - Feedback
+ *     summary: Re-run Gemini AI analysis for a feedback item
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: AI analysis re-triggered
+ */
+router.post("/:id/reanalyze", requireAdmin, retriggerFeedbackAnalysis);
 /**
  * @openapi
  * /api/feedback/{id}/restore:

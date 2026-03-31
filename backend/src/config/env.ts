@@ -7,6 +7,7 @@ export const env = {
   mongoUri: process.env.MONGO_URI ?? "",
   jwtSecret: process.env.JWT_SECRET ?? "",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
+  geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
   frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:3000",
   adminEmail: process.env.ADMIN_EMAIL ?? "admin@feedpulse.local",
   adminPassword: process.env.ADMIN_PASSWORD ?? "feedpulse-admin",

@@ -14,6 +14,17 @@ const initialState = {
   submitterEmail: ""
 };
 
+type SubmittedFeedback = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  ai_summary: string;
+  submittedByEmail: string;
+  createdAt: string;
+};
+
 export function FeedbackForm() {
   const [form, setForm] = useState(initialState);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,12 +68,15 @@ export function FeedbackForm() {
 
     try {
       const raw = window.localStorage.getItem("feedpulse-user");
-      const user = raw ? (JSON.parse(raw) as { name?: string; email?: string }) : null;
+      const user = raw ? (JSON.parse(raw) as { id?: string; name?: string; email?: string }) : null;
+      const token = window.localStorage.getItem("feedpulse-user-token") ?? "";
 
-      await apiRequest("/feedback", {
+      const response = await apiRequest<SubmittedFeedback>("/feedback", {
         method: "POST",
+        token: token || undefined,
         body: {
           ...form,
+          submittedByUserId: user?.id ?? "",
           submittedByEmail: user?.email ?? ""
         }
       });
@@ -72,7 +86,11 @@ export function FeedbackForm() {
         submitterEmail: user?.email ?? ""
       });
       setMessage({ type: "success", text: "Feedback submitted. The product team can review it now." });
-      window.dispatchEvent(new CustomEvent("feedpulse:feedback-submitted"));
+      window.dispatchEvent(
+        new CustomEvent("feedpulse:feedback-submitted", {
+          detail: response.data
+        })
+      );
     } catch (error) {
       setMessage({
         type: "error",

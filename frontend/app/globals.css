@@ -25,6 +25,11 @@
 html {
   scroll-behavior: auto;
   scrollbar-gutter: stable;
+  background:
+    radial-gradient(circle at top left, rgba(53, 37, 205, 0.12), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(79, 70, 229, 0.12), transparent 24%),
+    linear-gradient(180deg, #fcfbff, var(--bg));
+  overscroll-behavior: none;
 }
 
 body {
@@ -32,6 +37,7 @@ body {
   min-height: 100vh;
   width: 100%;
   overflow-x: hidden;
+  overscroll-behavior: none;
   background:
     radial-gradient(circle at top left, rgba(53, 37, 205, 0.12), transparent 28%),
     radial-gradient(circle at bottom right, rgba(79, 70, 229, 0.12), transparent 24%),
@@ -93,6 +99,10 @@ button {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+.auth-topbar {
+  padding-top: 8px;
 }
 
 .brand-inline {
@@ -249,6 +259,13 @@ button:disabled {
   padding: 24px;
 }
 
+.my-feedback-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
 .my-feedback-card h3 {
   margin: 14px 0 10px;
   font-family: var(--font-headline), sans-serif;
@@ -268,12 +285,44 @@ button:disabled {
   font-weight: 700;
 }
 
+.feedback-ai-note {
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .my-feedback-meta {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   color: var(--muted);
   font-size: 0.88rem;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status-pill.sent {
+  background: #e8edff;
+  color: #5f6dbd;
+}
+
+.status-pill.reviewed {
+  background: #fff1cb;
+  color: #b97705;
+}
+
+.status-pill.solved {
+  background: #e1f6e8;
+  color: #2f8d55;
 }
 
 .small-pill {
@@ -348,7 +397,7 @@ textarea {
 
 .auth-panel {
   max-width: 640px;
-  margin: 48px auto 0;
+  margin: 24px auto 0;
   padding: 28px;
 }
 
@@ -707,6 +756,17 @@ textarea {
   border-radius: 12px;
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.table-action-stack {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-action.ai {
+  background: #e6e4ff;
+  color: #4335cf;
 }
 
 .table-action.delete {

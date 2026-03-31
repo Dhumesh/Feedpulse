@@ -8,6 +8,7 @@ import { apiRequest } from "../lib/api";
 type FeedbackItem = {
   id: string;
   title: string;
+  description?: string;
   category: string;
   status: string;
   ai_sentiment: string;
@@ -104,6 +105,7 @@ export function AdminDashboard() {
   const [themes, setThemes] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [aiLoadingId, setAiLoadingId] = useState("");
 
   useEffect(() => {
     const storedToken = window.localStorage.getItem(tokenKey) ?? "";
@@ -218,6 +220,32 @@ export function AdminDashboard() {
       );
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Restore failed");
+    }
+  };
+
+  const rerunAi = async (id: string) => {
+    if (!token) {
+      return;
+    }
+
+    try {
+      setAiLoadingId(id);
+      const response = await apiRequest<FeedbackItem>(`/feedback/${id}/reanalyze`, {
+        method: "POST",
+        token
+      });
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((item) => (item.id === id ? { ...item, ...response.data } : item))
+            }
+          : current
+      );
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "AI re-analysis failed");
+    } finally {
+      setAiLoadingId("");
     }
   };
 
@@ -435,7 +463,7 @@ export function AdminDashboard() {
                       <th>Priority</th>
                       <th>Status</th>
                       <th>{activeTab === "trash" ? "Trashed" : "Date"}</th>
-                      <th>Action</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -472,15 +500,27 @@ export function AdminDashboard() {
                         </td>
                         <td>{new Date(activeTab === "trash" ? item.trashedAt ?? item.createdAt : item.createdAt).toLocaleDateString()}</td>
                         <td>
-                          {activeTab === "trash" ? (
-                            <button type="button" className="table-action restore" onClick={() => restoreFeedback(item.id)}>
-                              Restore
-                            </button>
-                          ) : (
-                            <button type="button" className="table-action delete" onClick={() => trashFeedback(item.id)}>
-                              Delete
-                            </button>
-                          )}
+                          <div className="table-action-stack">
+                            {activeTab === "trash" ? (
+                              <button type="button" className="table-action restore" onClick={() => restoreFeedback(item.id)}>
+                                Restore
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  className="table-action ai"
+                                  onClick={() => rerunAi(item.id)}
+                                  disabled={aiLoadingId === item.id}
+                                >
+                                  {aiLoadingId === item.id ? "Running AI..." : "Re-run AI"}
+                                </button>
+                                <button type="button" className="table-action delete" onClick={() => trashFeedback(item.id)}>
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

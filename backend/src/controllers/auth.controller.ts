@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import { User } from "../models/User";
 import { createVerificationToken, sendVerificationEmail } from "../services/email.service";
+import { storeEmailRecord } from "../services/email-record.service";
 import { createResponse } from "../utils/api";
 import { sanitizeEmail, sanitizeText } from "../utils/sanitize";
 import { hashPassword, verifyPassword } from "../utils/password";
@@ -46,6 +47,11 @@ export const registerUser = async (req: Request, res: Response) => {
   }
 
   await user.save();
+  await storeEmailRecord({
+    email: user.email,
+    source: "registration",
+    userId: user._id.toString()
+  });
 
   res.status(201).json(
     createResponse(
@@ -91,7 +97,9 @@ export const loginUser = async (req: Request, res: Response) => {
     return;
   }
 
-  const token = jwt.sign({ email: user.email, role: user.role }, env.jwtSecret, { expiresIn: "12h" });
+  const token = jwt.sign({ id: user._id.toString(), email: user.email, role: user.role }, env.jwtSecret, {
+    expiresIn: "12h"
+  });
 
   res.status(200).json(
     createResponse(
@@ -99,6 +107,7 @@ export const loginUser = async (req: Request, res: Response) => {
       {
         token,
         user: {
+          id: user._id.toString(),
           email: user.email,
           name: user.name,
           role: user.role

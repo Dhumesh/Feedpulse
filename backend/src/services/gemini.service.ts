@@ -56,7 +56,12 @@ export const analyzeFeedback = async (title: string, description: string): Promi
     throw new Error("Gemini API key is not configured");
   }
 
-  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = client.getGenerativeModel({
+    model: env.geminiModel,
+    generationConfig: {
+      responseMimeType: "application/json"
+    }
+  });
   const prompt = [
     "Analyse this product feedback.",
     "Return ONLY valid JSON with these fields: category, sentiment, priority_score, summary, tags.",
@@ -90,7 +95,12 @@ export const summarizeThemes = async (
     throw new Error("Gemini API key is not configured");
   }
 
-  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = client.getGenerativeModel({
+    model: env.geminiModel,
+    generationConfig: {
+      responseMimeType: "application/json"
+    }
+  });
   const prompt = [
     "Summarize recent product feedback.",
     "Return ONLY valid JSON with a `themes` array containing exactly 3 short strings.",

@@ -1,4 +1,24 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+
+function getApiUrl() {
+  const normalized = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
+
+  if (typeof window === "undefined") {
+    return normalized;
+  }
+
+  try {
+    const url = new URL(normalized);
+
+    if (url.hostname === "backend") {
+      url.hostname = window.location.hostname || "localhost";
+    }
+
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return normalized;
+  }
+}
 
 type RequestOptions = {
   method?: string;
@@ -7,7 +27,7 @@ type RequestOptions = {
 };
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}) {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`${getApiUrl()}${path}`, {
     method: options.method ?? "GET",
     headers: {
       "Content-Type": "application/json",
@@ -25,10 +45,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}) 
   };
 
   if (!response.ok || !payload.success) {
-    throw new Error(payload.message || payload.error || "Request failed");
+    throw new Error(payload.error || payload.message || "Request failed");
   }
 
   return payload;
 }
 
-export { API_URL };
+export { getApiUrl };

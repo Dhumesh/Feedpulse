@@ -58,7 +58,7 @@ export function AuthPanel() {
     setMessage(null);
 
     try {
-      const response = await apiRequest<{ token: string; user: { role: string; email: string; name: string } }>("/auth/login", {
+      const response = await apiRequest<{ token: string; user: { id: string; role: string; email: string; name: string } }>("/auth/login", {
         method: "POST",
         body: loginForm
       });

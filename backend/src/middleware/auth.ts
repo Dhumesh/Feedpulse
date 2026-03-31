@@ -4,6 +4,7 @@ import { env } from "../config/env";
 import { createResponse } from "../utils/api";
 
 type AuthPayload = {
+  id: string;
   email: string;
   role: "admin" | "user";
 };
@@ -15,6 +16,20 @@ export type AuthenticatedRequest = Request & {
 const readAuthToken = (req: Request) => {
   const authHeader = req.headers.authorization;
   return authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+};
+
+export const getAuthUserFromRequest = (req: Request): AuthPayload | null => {
+  const token = readAuthToken(req);
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    return jwt.verify(token, env.jwtSecret) as AuthPayload;
+  } catch {
+    return null;
+  }
 };
 
 export const requireAuth = (

@@ -10,6 +10,7 @@ export type FeedbackDocument = HydratedDocument<{
   description: string;
   category: string;
   status: string;
+  submittedByUserId?: string;
   submittedByEmail?: string;
   submitterName?: string;
   submitterEmail?: string;
@@ -49,6 +50,10 @@ const feedbackSchema = new mongoose.Schema(
       type: String,
       enum: feedbackStatuses,
       default: "New"
+    },
+    submittedByUserId: {
+      type: String,
+      trim: true
     },
     submittedByEmail: {
       type: String,
