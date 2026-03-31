@@ -1,10 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiRequest } from "../lib/api";
-import { useScrollReveal } from "./use-scroll-reveal";
 
 type FeedbackItem = {
   id: string;
@@ -89,7 +88,6 @@ function priorityStars(value: number | null) {
 
 export function AdminDashboard() {
   const router = useRouter();
-  const rootRef = useRef<HTMLElement | null>(null);
   const [token, setToken] = useState("");
   const [loginForm, setLoginForm] = useState({
     email: "clarishajoseph016@gmail.com",
@@ -108,8 +106,6 @@ export function AdminDashboard() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [aiLoadingId, setAiLoadingId] = useState("");
-
-  useScrollReveal(rootRef);
 
   useEffect(() => {
     const storedToken = window.localStorage.getItem(tokenKey) ?? "";
@@ -264,7 +260,7 @@ export function AdminDashboard() {
 
   if (!token) {
     return (
-      <section className="panel dashboard-login reveal-up is-visible" data-reveal ref={rootRef}>
+      <section className="panel dashboard-login">
         <div className="section-heading">
           <span className="pill">Protected dashboard</span>
           <h2>Admin login</h2>
@@ -296,7 +292,7 @@ export function AdminDashboard() {
   }
 
   return (
-    <section className="dashboard-shell" ref={rootRef}>
+    <section className="dashboard-shell">
       <aside className="dashboard-sidebar">
         <Link href="/" className="brand-block">
           <div className="brand-mark">P</div>
@@ -324,7 +320,7 @@ export function AdminDashboard() {
       </aside>
 
       <div className="dashboard-content">
-        <header className="admin-header reveal-up is-visible" data-reveal style={{ ["--reveal-delay" as string]: "40ms" }}>
+        <header className="admin-header">
           <div>
             <h1>{activeTab === "dashboard" ? "Admin Insights" : activeTab === "feedback" ? "All Feedback" : "Trash"}</h1>
             <p>
@@ -352,22 +348,22 @@ export function AdminDashboard() {
         {activeTab === "dashboard" ? (
           <>
             <section className="admin-stats">
-              <article className="metric-card reveal-up" data-reveal style={{ ["--reveal-delay" as string]: "80ms" }}>
+              <article className="metric-card">
                 <span className="metric-badge cool">+ live</span>
                 <p>Total feedback</p>
                 <strong>{data?.stats.totalFeedback ?? 0}</strong>
               </article>
-              <article className="metric-card reveal-up" data-reveal style={{ ["--reveal-delay" as string]: "140ms" }}>
+              <article className="metric-card">
                 <span className="metric-badge warm">Active</span>
                 <p>Open items</p>
                 <strong>{data?.stats.openItems ?? 0}</strong>
               </article>
-              <article className="metric-card reveal-up" data-reveal style={{ ["--reveal-delay" as string]: "200ms" }}>
+              <article className="metric-card">
                 <span className="metric-badge muted">High</span>
                 <p>Avg priority</p>
                 <strong>{data?.stats.averagePriority ?? 0}</strong>
               </article>
-              <article className="metric-card reveal-up" data-reveal style={{ ["--reveal-delay" as string]: "260ms" }}>
+              <article className="metric-card">
                 <span className="metric-badge soft">Top</span>
                 <p>Top tag</p>
                 <strong>{data?.stats.mostCommonTag ?? "N/A"}</strong>
@@ -375,7 +371,7 @@ export function AdminDashboard() {
             </section>
 
             <section className="summary-grid">
-              <article className="summary-hero reveal-left" data-reveal style={{ ["--reveal-delay" as string]: "110ms" }}>
+              <article className="summary-hero">
                 <p className="summary-kicker">AI Summary</p>
                 <h2>Critical product themes from the last 7 days</h2>
                 <div className="theme-list">
@@ -389,7 +385,7 @@ export function AdminDashboard() {
                 </div>
               </article>
 
-              <article className="quick-actions reveal-right" data-reveal style={{ ["--reveal-delay" as string]: "180ms" }}>
+              <article className="quick-actions">
                 <h3>Quick Actions</h3>
                 <button className="quick-action" type="button" onClick={() => setActiveTab("feedback")}>
                   Review all feedback
@@ -407,7 +403,7 @@ export function AdminDashboard() {
 
         {activeTab !== "dashboard" ? (
           <>
-            <section className="filter-bar reveal-up" data-reveal style={{ ["--reveal-delay" as string]: "80ms" }}>
+            <section className="filter-bar">
               <div className="filter-row">
                 <label className="filter-chip">
                   <span>Category</span>
@@ -456,7 +452,7 @@ export function AdminDashboard() {
             {error ? <p className="notice error">{error}</p> : null}
             {loading ? <p className="notice">Loading feedback...</p> : null}
 
-            <section className="table-card reveal-up" data-reveal style={{ ["--reveal-delay" as string]: "130ms" }}>
+            <section className="table-card">
               <div className="table-scroll">
                 <table className="insight-table">
                   <thead>
