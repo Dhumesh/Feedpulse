@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FeedbackForm } from "./feedback-form";
 import { apiRequest } from "../lib/api";
+import { useScrollReveal } from "./use-scroll-reveal";
 
 type StoredUser = {
   id: string;
@@ -38,8 +39,11 @@ function statusTagClass(status: string) {
 const userStorageKey = "feedpulse-user";
 
 export function HomeShell() {
+  const rootRef = useRef<HTMLElement | null>(null);
   const [user, setUser] = useState<StoredUser | null>(null);
   const [items, setItems] = useState<MyFeedbackItem[]>([]);
+
+  useScrollReveal(rootRef);
 
   useEffect(() => {
     const fetchMine = async () => {
@@ -111,7 +115,7 @@ export function HomeShell() {
   };
 
   return (
-    <main className="landing-page">
+    <main className="landing-page" ref={rootRef}>
       <header className="shell landing-topbar">
         <Link href="/" className="brand-inline">
           <span className="brand-mark small">P</span>
@@ -139,7 +143,7 @@ export function HomeShell() {
       </header>
 
       <section className="landing-hero shell">
-        <div className="landing-copy">
+        <div className="landing-copy reveal-up is-visible" data-reveal style={{ ["--reveal-delay" as string]: "80ms" }}>
           <span className="pill">The Digital Curator</span>
           <h1>FeedPulse turns user feedback into product clarity.</h1>
           <p>
@@ -153,7 +157,7 @@ export function HomeShell() {
           </div>
         </div>
 
-        <div className="landing-spotlight">
+        <div className="landing-spotlight reveal-right is-visible" data-reveal style={{ ["--reveal-delay" as string]: "180ms" }}>
           <div className="spotlight-card primary">
             <span>AI Categorization</span>
             <strong>Bug, feature request, improvement, or other</strong>
@@ -169,12 +173,21 @@ export function HomeShell() {
         </div>
       </section>
 
-      <section id="submit" className="shell submit-section">
+      <section
+        id="submit"
+        className="shell submit-section reveal-up"
+        data-reveal
+        style={{ ["--reveal-delay" as string]: "90ms" }}
+      >
         <FeedbackForm />
       </section>
 
       {user ? (
-        <section className="shell my-feedback-section">
+        <section
+          className="shell my-feedback-section reveal-up"
+          data-reveal
+          style={{ ["--reveal-delay" as string]: "110ms" }}
+        >
           <div className="section-heading">
             <span className="pill">My feedback</span>
             <h2>Your submitted feedback</h2>
@@ -183,8 +196,13 @@ export function HomeShell() {
 
           <div className="my-feedback-grid">
             {items.length ? (
-              items.map((item) => (
-                <article key={item.id} className="panel my-feedback-card">
+              items.map((item, index) => (
+                <article
+                  key={item.id}
+                  className="panel my-feedback-card reveal-up"
+                  data-reveal
+                  style={{ ["--reveal-delay" as string]: `${140 + index * 70}ms` }}
+                >
                   <div className="my-feedback-top">
                     <span className="pill small-pill">{item.category}</span>
                     <span className={statusTagClass(item.status)}>
@@ -204,7 +222,7 @@ export function HomeShell() {
                 </article>
               ))
             ) : (
-              <article className="panel my-feedback-card empty-state">
+              <article className="panel my-feedback-card empty-state reveal-up" data-reveal>
                 <h3>No feedback submitted yet</h3>
                 <p>Once you submit feedback, it will appear here.</p>
               </article>
