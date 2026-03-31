@@ -3,11 +3,13 @@ import {
   deleteFeedback,
   getFeedbackById,
   getFeedbackList,
+  getMyFeedback,
   getFeedbackSummary,
+  restoreFeedback,
   submitFeedback,
   updateFeedbackStatus
 } from "../controllers/feedback.controller";
-import { requireAdmin } from "../middleware/auth";
+import { requireAdmin, requireAuth } from "../middleware/auth";
 import { feedbackRateLimit } from "../middleware/rateLimit";
 
 const router = Router();
@@ -30,6 +32,7 @@ const router = Router();
  *         description: Feedback submitted
  */
 router.post("/", feedbackRateLimit, submitFeedback);
+router.get("/mine", requireAuth, getMyFeedback);
 /**
  * @openapi
  * /api/feedback/summary:
@@ -79,6 +82,26 @@ router.get("/summary", requireAdmin, getFeedbackSummary);
  *         description: Feedback fetched
  */
 router.get("/", requireAdmin, getFeedbackList);
+/**
+ * @openapi
+ * /api/feedback/{id}/restore:
+ *   patch:
+ *     tags:
+ *       - Feedback
+ *     summary: Restore feedback from trash
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Feedback restored
+ */
+router.patch("/:id/restore", requireAdmin, restoreFeedback);
 /**
  * @openapi
  * /api/feedback/{id}:

@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { apiRequest } from "../lib/api";
 
 type FeedbackItem = {
@@ -12,6 +14,8 @@ type FeedbackItem = {
   ai_priority: number | null;
   ai_summary: string;
   ai_tags: string[];
+  isTrashed: boolean;
+  trashedAt: string | null;
   createdAt: string;
 };
 
@@ -47,11 +51,9 @@ const tokenKey = "feedpulse-admin-token";
 
 function sentimentClass(value: string) {
   const lower = value.toLowerCase();
-
   if (lower === "positive" || lower === "negative" || lower === "neutral") {
     return `sentiment-chip sentiment-${lower}`;
   }
-
   return "sentiment-chip sentiment-neutral";
 }
 
@@ -59,15 +61,12 @@ function categoryClass(value: string) {
   if (value === "Feature Request") {
     return "tag feature";
   }
-
   if (value === "Improvement") {
     return "tag improvement";
   }
-
   if (value === "Bug") {
     return "tag bug";
   }
-
   return "tag other";
 }
 
@@ -75,11 +74,9 @@ function statusClass(value: string) {
   if (value === "Resolved") {
     return "status-select resolved";
   }
-
   if (value === "In Review") {
     return "status-select review";
   }
-
   return "status-select new";
 }
 
@@ -89,11 +86,13 @@ function priorityStars(value: number | null) {
 }
 
 export function AdminDashboard() {
+  const router = useRouter();
   const [token, setToken] = useState("");
   const [loginForm, setLoginForm] = useState({
-    email: "admin@feedpulse.local",
-    password: "feedpulse-admin"
+    email: "clarishajoseph016@gmail.com",
+    password: "123456"
   });
+  const [activeTab, setActiveTab] = useState<"dashboard" | "feedback" | "trash">("dashboard");
   const [filters, setFilters] = useState({
     category: "All",
     status: "All",
@@ -115,23 +114,22 @@ export function AdminDashboard() {
     const params = new URLSearchParams({
       page: String(filters.page),
       limit: "10",
-      sortBy: filters.sortBy
+      sortBy: filters.sortBy,
+      trashed: activeTab === "trash" ? "true" : "false"
     });
 
     if (filters.category !== "All") {
       params.set("category", filters.category);
     }
-
     if (filters.status !== "All") {
       params.set("status", filters.status);
     }
-
     if (filters.search.trim()) {
       params.set("search", filters.search.trim());
     }
 
     return params.toString();
-  }, [filters]);
+  }, [activeTab, filters]);
 
   useEffect(() => {
     if (!token) {
@@ -147,7 +145,6 @@ export function AdminDashboard() {
           apiRequest<DashboardPayload>(`/feedback?${queryString}`, { token }),
           apiRequest<SummaryPayload>("/feedback/summary", { token })
         ]);
-
         setData(feedbackResponse.data);
         setThemes(summaryResponse.data.themes ?? []);
       } catch (requestError) {
@@ -180,7 +177,6 @@ export function AdminDashboard() {
     if (!token) {
       return;
     }
-
     try {
       await apiRequest(`/feedback/${id}`, {
         method: "PATCH",
@@ -189,10 +185,7 @@ export function AdminDashboard() {
       });
       setData((current) =>
         current
-          ? {
-              ...current,
-              items: current.items.map((item) => (item.id === id ? { ...item, status } : item))
-            }
+          ? { ...current, items: current.items.map((item) => (item.id === id ? { ...item, status } : item)) }
           : current
       );
     } catch (requestError) {
@@ -200,10 +193,41 @@ export function AdminDashboard() {
     }
   };
 
+  const trashFeedback = async (id: string) => {
+    if (!token) {
+      return;
+    }
+    try {
+      await apiRequest(`/feedback/${id}`, { method: "DELETE", token });
+      setData((current) =>
+        current ? { ...current, items: current.items.filter((item) => item.id !== id) } : current
+      );
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Delete failed");
+    }
+  };
+
+  const restoreFeedback = async (id: string) => {
+    if (!token) {
+      return;
+    }
+    try {
+      await apiRequest(`/feedback/${id}/restore`, { method: "PATCH", token });
+      setData((current) =>
+        current ? { ...current, items: current.items.filter((item) => item.id !== id) } : current
+      );
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Restore failed");
+    }
+  };
+
   const logout = () => {
     window.localStorage.removeItem(tokenKey);
+    window.localStorage.removeItem("feedpulse-user-token");
+    window.localStorage.removeItem("feedpulse-user");
     setToken("");
     setData(null);
+    router.push("/");
   };
 
   if (!token) {
@@ -212,7 +236,7 @@ export function AdminDashboard() {
         <div className="section-heading">
           <span className="pill">Protected dashboard</span>
           <h2>Admin login</h2>
-          <p>Use the hardcoded admin credentials configured in the backend.</p>
+          <p>Use your admin email and password to manage all feedback.</p>
         </div>
 
         <form onSubmit={login} className="login-grid">
@@ -224,7 +248,6 @@ export function AdminDashboard() {
               onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
             />
           </label>
-
           <label>
             Password
             <input
@@ -233,9 +256,7 @@ export function AdminDashboard() {
               onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
             />
           </label>
-
           {error ? <p className="notice error">{error}</p> : null}
-
           <button type="submit">Enter dashboard</button>
         </form>
       </section>
@@ -245,18 +266,24 @@ export function AdminDashboard() {
   return (
     <section className="dashboard-shell">
       <aside className="dashboard-sidebar">
-        <div className="brand-block">
+        <Link href="/" className="brand-block">
           <div className="brand-mark">P</div>
           <div>
             <strong>FeedPulse</strong>
             <span>AI CURATOR</span>
           </div>
-        </div>
+        </Link>
 
         <nav className="sidebar-nav">
-          <span className="sidebar-link active">Dashboard</span>
-          <span className="sidebar-link">Feedback</span>
-          <span className="sidebar-link">Settings</span>
+          <button type="button" className={activeTab === "dashboard" ? "sidebar-link active" : "sidebar-link"} onClick={() => setActiveTab("dashboard")}>
+            Dashboard
+          </button>
+          <button type="button" className={activeTab === "feedback" ? "sidebar-link active" : "sidebar-link"} onClick={() => setActiveTab("feedback")}>
+            Feedback
+          </button>
+          <button type="button" className={activeTab === "trash" ? "sidebar-link active" : "sidebar-link"} onClick={() => setActiveTab("trash")}>
+            Trash
+          </button>
         </nav>
 
         <button className="sidebar-logout" onClick={logout}>
@@ -267,8 +294,14 @@ export function AdminDashboard() {
       <div className="dashboard-content">
         <header className="admin-header">
           <div>
-            <h1>Admin Insights</h1>
-            <p>Real-time pulse of customer sentiment and feedback items.</p>
+            <h1>{activeTab === "dashboard" ? "Admin Insights" : activeTab === "feedback" ? "All Feedback" : "Trash"}</h1>
+            <p>
+              {activeTab === "dashboard"
+                ? "Real-time pulse of customer sentiment and feedback items."
+                : activeTab === "feedback"
+                  ? "All submitted feedback is stored here."
+                  : "Restore feedback that was moved to trash."}
+            </p>
           </div>
 
           <div className="admin-toolbar">
@@ -284,190 +317,205 @@ export function AdminDashboard() {
           </div>
         </header>
 
-        <section className="admin-stats">
-          <article className="metric-card">
-            <span className="metric-badge cool">+ live</span>
-            <p>Total feedback</p>
-            <strong>{data?.stats.totalFeedback ?? 0}</strong>
-          </article>
-          <article className="metric-card">
-            <span className="metric-badge warm">Active</span>
-            <p>Open items</p>
-            <strong>{data?.stats.openItems ?? 0}</strong>
-          </article>
-          <article className="metric-card">
-            <span className="metric-badge muted">High</span>
-            <p>Avg priority</p>
-            <strong>{data?.stats.averagePriority ?? 0}</strong>
-          </article>
-          <article className="metric-card">
-            <span className="metric-badge soft">Top</span>
-            <p>Top tag</p>
-            <strong>{data?.stats.mostCommonTag ?? "N/A"}</strong>
-          </article>
-        </section>
+        {activeTab === "dashboard" ? (
+          <>
+            <section className="admin-stats">
+              <article className="metric-card">
+                <span className="metric-badge cool">+ live</span>
+                <p>Total feedback</p>
+                <strong>{data?.stats.totalFeedback ?? 0}</strong>
+              </article>
+              <article className="metric-card">
+                <span className="metric-badge warm">Active</span>
+                <p>Open items</p>
+                <strong>{data?.stats.openItems ?? 0}</strong>
+              </article>
+              <article className="metric-card">
+                <span className="metric-badge muted">High</span>
+                <p>Avg priority</p>
+                <strong>{data?.stats.averagePriority ?? 0}</strong>
+              </article>
+              <article className="metric-card">
+                <span className="metric-badge soft">Top</span>
+                <p>Top tag</p>
+                <strong>{data?.stats.mostCommonTag ?? "N/A"}</strong>
+              </article>
+            </section>
 
-        <section className="filter-bar">
-          <div className="filter-row">
-            <label className="filter-chip">
-              <span>Category</span>
-              <select
-                value={filters.category}
-                onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value, page: 1 }))}
-              >
-                {categoryOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <section className="summary-grid">
+              <article className="summary-hero">
+                <p className="summary-kicker">AI Summary</p>
+                <h2>Critical product themes from the last 7 days</h2>
+                <div className="theme-list">
+                  {themes.length
+                    ? themes.map((theme) => (
+                        <span key={theme} className="summary-theme">
+                          {theme}
+                        </span>
+                      ))
+                    : <span className="summary-theme">No summary available yet.</span>}
+                </div>
+              </article>
 
-            <label className="filter-chip">
-              <span>Status</span>
-              <select
-                value={filters.status}
-                onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value, page: 1 }))}
-              >
-                {statusFilterOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <article className="quick-actions">
+                <h3>Quick Actions</h3>
+                <button className="quick-action" type="button" onClick={() => setActiveTab("feedback")}>
+                  Review all feedback
+                </button>
+                <button className="quick-action" type="button">
+                  Assign high priority
+                </button>
+                <button className="quick-action" type="button" onClick={() => setActiveTab("trash")}>
+                  Open trash
+                </button>
+              </article>
+            </section>
+          </>
+        ) : null}
 
-            <label className="filter-chip">
-              <span>Sort</span>
-              <select
-                value={filters.sortBy}
-                onChange={(event) => setFilters((current) => ({ ...current, sortBy: event.target.value }))}
-              >
-                {sortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+        {activeTab !== "dashboard" ? (
+          <>
+            <section className="filter-bar">
+              <div className="filter-row">
+                <label className="filter-chip">
+                  <span>Category</span>
+                  <select
+                    value={filters.category}
+                    onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value, page: 1 }))}
+                  >
+                    {categoryOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-          <button className="export-button" type="button">
-            Export Report
-          </button>
-        </section>
+                <label className="filter-chip">
+                  <span>Status</span>
+                  <select
+                    value={filters.status}
+                    onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value, page: 1 }))}
+                  >
+                    {statusFilterOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-        {error ? <p className="notice error">{error}</p> : null}
-        {loading ? <p className="notice">Loading feedback...</p> : null}
+                <label className="filter-chip">
+                  <span>Sort</span>
+                  <select
+                    value={filters.sortBy}
+                    onChange={(event) => setFilters((current) => ({ ...current, sortBy: event.target.value }))}
+                  >
+                    {sortOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </section>
 
-        <section className="table-card">
-          <div className="table-scroll">
-            <table className="insight-table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Category</th>
-                  <th>Sentiment</th>
-                  <th>Priority</th>
-                  <th>Status</th>
-                  <th>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data?.items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <strong>{item.title}</strong>
-                      <span>{item.ai_summary || "AI summary not available yet."}</span>
-                    </td>
-                    <td>
-                      <span className={categoryClass(item.category)}>{item.category}</span>
-                    </td>
-                    <td>
-                      <span className={sentimentClass(item.ai_sentiment || "Neutral")}>
-                        {item.ai_sentiment || "Pending AI"}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="priority-stars">{priorityStars(item.ai_priority)}</span>
-                    </td>
-                    <td>
-                      <select
-                        className={statusClass(item.status)}
-                        value={item.status}
-                        onChange={(event) => updateStatus(item.id, event.target.value)}
-                      >
-                        {statusOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>{new Date(item.createdAt).toLocaleDateString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            {error ? <p className="notice error">{error}</p> : null}
+            {loading ? <p className="notice">Loading feedback...</p> : null}
 
-          <footer className="table-footer">
-            <p>
-              Showing {data?.items.length ?? 0} of {data?.pagination.total ?? 0} items
-            </p>
-            <div className="pager">
-              <button
-                disabled={(data?.pagination.page ?? 1) <= 1}
-                onClick={() => setFilters((current) => ({ ...current, page: Math.max(1, current.page - 1) }))}
-              >
-                Prev
-              </button>
-              <span className="page-indicator">{data?.pagination.page ?? 1}</span>
-              <button
-                disabled={(data?.pagination.page ?? 1) >= (data?.pagination.totalPages ?? 1)}
-                onClick={() =>
-                  setFilters((current) => ({
-                    ...current,
-                    page: Math.min(data?.pagination.totalPages ?? current.page, current.page + 1)
-                  }))
-                }
-              >
-                Next
-              </button>
-            </div>
-          </footer>
-        </section>
+            <section className="table-card">
+              <div className="table-scroll">
+                <table className="insight-table">
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Category</th>
+                      <th>Sentiment</th>
+                      <th>Priority</th>
+                      <th>Status</th>
+                      <th>{activeTab === "trash" ? "Trashed" : "Date"}</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data?.items.map((item) => (
+                      <tr key={item.id}>
+                        <td>
+                          <strong>{item.title}</strong>
+                          <span>{item.ai_summary || item.description || "No summary available yet."}</span>
+                        </td>
+                        <td>
+                          <span className={categoryClass(item.category)}>{item.category}</span>
+                        </td>
+                        <td>
+                          <span className={sentimentClass(item.ai_sentiment || "Neutral")}>
+                            {item.ai_sentiment || "Pending AI"}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="priority-stars">{priorityStars(item.ai_priority)}</span>
+                        </td>
+                        <td>
+                          <select
+                            className={statusClass(item.status)}
+                            value={item.status}
+                            disabled={activeTab === "trash"}
+                            onChange={(event) => updateStatus(item.id, event.target.value)}
+                          >
+                            {statusOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>{new Date(activeTab === "trash" ? item.trashedAt ?? item.createdAt : item.createdAt).toLocaleDateString()}</td>
+                        <td>
+                          {activeTab === "trash" ? (
+                            <button type="button" className="table-action restore" onClick={() => restoreFeedback(item.id)}>
+                              Restore
+                            </button>
+                          ) : (
+                            <button type="button" className="table-action delete" onClick={() => trashFeedback(item.id)}>
+                              Delete
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-        <section className="summary-grid">
-          <article className="summary-hero">
-            <p className="summary-kicker">AI Summary</p>
-            <h2>Critical product themes from the last 7 days</h2>
-            <div className="theme-list">
-              {themes.length ? (
-                themes.map((theme) => (
-                  <span key={theme} className="summary-theme">
-                    {theme}
-                  </span>
-                ))
-              ) : (
-                <span className="summary-theme">No summary available yet.</span>
-              )}
-            </div>
-          </article>
-
-          <article className="quick-actions">
-            <h3>Quick Actions</h3>
-            <button className="quick-action" type="button">
-              Review pending items
-            </button>
-            <button className="quick-action" type="button">
-              Assign high priority
-            </button>
-            <button className="quick-action" type="button">
-              Sync to Jira/Linear
-            </button>
-          </article>
-        </section>
+              <footer className="table-footer">
+                <p>
+                  Showing {data?.items.length ?? 0} of {data?.pagination.total ?? 0} items
+                </p>
+                <div className="pager">
+                  <button
+                    disabled={(data?.pagination.page ?? 1) <= 1}
+                    onClick={() => setFilters((current) => ({ ...current, page: Math.max(1, current.page - 1) }))}
+                  >
+                    Prev
+                  </button>
+                  <span className="page-indicator">{data?.pagination.page ?? 1}</span>
+                  <button
+                    disabled={(data?.pagination.page ?? 1) >= (data?.pagination.totalPages ?? 1)}
+                    onClick={() =>
+                      setFilters((current) => ({
+                        ...current,
+                        page: Math.min(data?.pagination.totalPages ?? current.page, current.page + 1)
+                      }))
+                    }
+                  >
+                    Next
+                  </button>
+                </div>
+              </footer>
+            </section>
+          </>
+        ) : null}
       </div>
     </section>
   );

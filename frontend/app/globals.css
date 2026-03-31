@@ -23,12 +23,15 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
+  scrollbar-gutter: stable;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at top left, rgba(53, 37, 205, 0.12), transparent 28%),
     radial-gradient(circle at bottom right, rgba(79, 70, 229, 0.12), transparent 24%),
@@ -55,7 +58,7 @@ button {
 }
 
 .shell {
-  width: min(1160px, calc(100vw - 32px));
+  width: min(1160px, calc(100% - 32px));
   margin: 0 auto;
 }
 
@@ -165,7 +168,7 @@ button {
 button {
   border-radius: 16px;
   padding: 14px 20px;
-  transition: transform 160ms ease, opacity 160ms ease, background 160ms ease;
+  transition: opacity 160ms ease, background 160ms ease, color 160ms ease;
 }
 
 .primary-link,
@@ -180,16 +183,9 @@ button {
   border: 1px solid rgba(53, 37, 205, 0.1);
 }
 
-button:hover,
-.primary-link:hover,
-.secondary-link:hover {
-  transform: translateY(-1px);
-}
-
 button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-  transform: none;
 }
 
 .landing-spotlight {
@@ -237,6 +233,56 @@ button:disabled {
 
 .submit-section {
   padding-bottom: 48px;
+}
+
+.my-feedback-section {
+  padding-bottom: 56px;
+}
+
+.my-feedback-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.my-feedback-card {
+  padding: 24px;
+}
+
+.my-feedback-card h3 {
+  margin: 14px 0 10px;
+  font-family: var(--font-headline), sans-serif;
+  font-size: 1.35rem;
+}
+
+.my-feedback-card p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.submitted-account {
+  margin-bottom: 12px;
+  color: var(--primary);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.my-feedback-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.small-pill {
+  font-size: 0.72rem;
+  padding: 6px 10px;
+}
+
+.empty-state {
+  grid-column: 1 / -1;
 }
 
 .form-card,
@@ -394,6 +440,10 @@ textarea {
   color: var(--muted);
   text-align: left;
   font-weight: 600;
+}
+
+.sidebar-link {
+  border: none;
 }
 
 .sidebar-link.active {
@@ -652,6 +702,23 @@ textarea {
   font-weight: 700;
 }
 
+.table-action {
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.table-action.delete {
+  background: #ffe1e1;
+  color: #b03838;
+}
+
+.table-action.restore {
+  background: #e1f6e8;
+  color: #2f8d55;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: 1.35fr 0.65fr;
@@ -705,6 +772,7 @@ textarea {
   .landing-hero,
   .admin-stats,
   .summary-grid,
+  .my-feedback-grid,
   .two-col,
   .login-grid {
     grid-template-columns: 1fr;

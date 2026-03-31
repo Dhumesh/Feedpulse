@@ -12,13 +12,17 @@ export type AuthenticatedRequest = Request & {
   user?: AuthPayload;
 };
 
-export const requireAdmin = (
+const readAuthToken = (req: Request) => {
+  const authHeader = req.headers.authorization;
+  return authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+};
+
+export const requireAuth = (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const token = readAuthToken(req);
 
   if (!token) {
     res.status(401).json(createResponse(false, null, "Authentication required", "UNAUTHORIZED"));
@@ -36,4 +40,19 @@ export const requireAdmin = (
   } catch {
     res.status(401).json(createResponse(false, null, "Invalid or expired token", "UNAUTHORIZED"));
   }
+};
+
+export const requireAdmin = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  requireAuth(req, res, () => {
+    if (req.user?.role !== "admin") {
+      res.status(401).json(createResponse(false, null, "Admin access required", "UNAUTHORIZED"));
+      return;
+    }
+
+    next();
+  });
 };

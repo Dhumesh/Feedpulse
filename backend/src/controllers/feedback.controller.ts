@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { FilterQuery } from "mongoose";
 import { Feedback, FeedbackDocument } from "../models/Feedback";
+import { AuthenticatedRequest } from "../middleware/auth";
 import { analyzeFeedback, summarizeThemes } from "../services/gemini.service";
 import {
   FeedbackCategory,
@@ -15,12 +16,38 @@ import {
   sanitizeText
 } from "../utils/sanitize";
 
+const processFeedbackAnalysis = async (feedbackId: string, title: string, description: string) => {
+  try {
+    const feedback = await Feedback.findById(feedbackId);
+
+    if (!feedback) {
+      return;
+    }
+
+    const analysis = await analyzeFeedback(title, description);
+    feedback.ai_category = analysis.category;
+    feedback.ai_sentiment = analysis.sentiment;
+    feedback.ai_priority = analysis.priority_score;
+    feedback.ai_summary = analysis.summary;
+    feedback.ai_tags = analysis.tags;
+    feedback.ai_processed = true;
+    feedback.ai_error = undefined;
+    await feedback.save();
+  } catch (error) {
+    await Feedback.findByIdAndUpdate(feedbackId, {
+      ai_processed: false,
+      ai_error: error instanceof Error ? error.message : "AI analysis failed"
+    });
+  }
+};
+
 const serialize = (doc: FeedbackDocument) => ({
   id: doc._id.toString(),
   title: doc.title,
   description: doc.description,
   category: doc.category,
   status: doc.status,
+  submittedByEmail: doc.submittedByEmail ?? "",
   submitterName: doc.submitterName ?? "",
   submitterEmail: doc.submitterEmail ?? "",
   ai_category: doc.ai_category ?? "",
@@ -30,6 +57,8 @@ const serialize = (doc: FeedbackDocument) => ({
   ai_tags: doc.ai_tags ?? [],
   ai_processed: doc.ai_processed,
   ai_error: doc.ai_error ?? "",
+  isTrashed: doc.isTrashed,
+  trashedAt: doc.trashedAt ?? null,
   createdAt: doc.createdAt,
   updatedAt: doc.updatedAt
 });
@@ -39,6 +68,15 @@ const buildQuery = (req: Request): FilterQuery<FeedbackDocument> => {
   const category = sanitizeText(req.query.category);
   const status = sanitizeText(req.query.status);
   const search = sanitizeText(req.query.search);
+  const trashed = sanitizeText(req.query.trashed);
+
+  if (trashed === "true") {
+    query.isTrashed = true;
+  } else if (trashed === "all") {
+    query.isTrashed = { $in: [true, false] };
+  } else {
+    query.isTrashed = false;
+  }
 
   if (feedbackCategories.includes(category as FeedbackCategory)) {
     query.category = category;
@@ -64,6 +102,7 @@ export const submitFeedback = async (req: Request, res: Response) => {
   const category = sanitizeText(req.body.category) as FeedbackCategory;
   const submitterName = sanitizeText(req.body.submitterName);
   const submitterEmail = sanitizeEmail(req.body.submitterEmail);
+  const submittedByEmail = sanitizeEmail(req.body.submittedByEmail);
 
   if (!title) {
     res.status(400).json(createResponse(false, null, "Title is required", "VALIDATION_ERROR"));
@@ -86,27 +125,14 @@ export const submitFeedback = async (req: Request, res: Response) => {
     title,
     description,
     category,
+    submittedByEmail: submittedByEmail || undefined,
     submitterName: submitterName || undefined,
     submitterEmail: submitterEmail || undefined
   });
 
-  try {
-    const analysis = await analyzeFeedback(title, description);
-    feedback.ai_category = analysis.category;
-    feedback.ai_sentiment = analysis.sentiment;
-    feedback.ai_priority = analysis.priority_score;
-    feedback.ai_summary = analysis.summary;
-    feedback.ai_tags = analysis.tags;
-    feedback.ai_processed = true;
-    feedback.ai_error = undefined;
-    await feedback.save();
-  } catch (error) {
-    feedback.ai_processed = false;
-    feedback.ai_error = error instanceof Error ? error.message : "AI analysis failed";
-    await feedback.save();
-  }
-
   res.status(201).json(createResponse(true, serialize(feedback), "Feedback submitted"));
+
+  void processFeedbackAnalysis(feedback._id.toString(), title, description);
 };
 
 export const getFeedbackList = async (req: Request, res: Response) => {
@@ -186,6 +212,30 @@ export const getFeedbackList = async (req: Request, res: Response) => {
   );
 };
 
+export const getMyFeedback = async (req: AuthenticatedRequest, res: Response) => {
+  const email = req.user?.email;
+
+  if (!email) {
+    res.status(401).json(createResponse(false, null, "Authentication required", "UNAUTHORIZED"));
+    return;
+  }
+
+  const items = await Feedback.find({
+    submittedByEmail: email,
+    isTrashed: false
+  }).sort({ createdAt: -1 });
+
+  res.status(200).json(
+    createResponse(
+      true,
+      {
+        items: items.map((item) => serialize(item))
+      },
+      "User feedback fetched"
+    )
+  );
+};
+
 export const getFeedbackById = async (req: Request, res: Response) => {
   const item = await Feedback.findById(req.params.id);
   if (!item) {
@@ -218,20 +268,45 @@ export const updateFeedbackStatus = async (req: Request, res: Response) => {
 };
 
 export const deleteFeedback = async (req: Request, res: Response) => {
-  const item = await Feedback.findByIdAndDelete(req.params.id);
+  const item = await Feedback.findByIdAndUpdate(
+    req.params.id,
+    {
+      isTrashed: true,
+      trashedAt: new Date()
+    },
+    { new: true }
+  );
   if (!item) {
     res.status(404).json(createResponse(false, null, "Feedback not found", "NOT_FOUND"));
     return;
   }
 
-  res.status(200).json(createResponse(true, { id: req.params.id }, "Feedback deleted"));
+  res.status(200).json(createResponse(true, serialize(item), "Feedback moved to trash"));
+};
+
+export const restoreFeedback = async (req: Request, res: Response) => {
+  const item = await Feedback.findByIdAndUpdate(
+    req.params.id,
+    {
+      isTrashed: false,
+      trashedAt: undefined
+    },
+    { new: true }
+  );
+
+  if (!item) {
+    res.status(404).json(createResponse(false, null, "Feedback not found", "NOT_FOUND"));
+    return;
+  }
+
+  res.status(200).json(createResponse(true, serialize(item), "Feedback restored"));
 };
 
 export const getFeedbackSummary = async (_req: Request, res: Response) => {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  const items = await Feedback.find({ createdAt: { $gte: sevenDaysAgo } })
+  const items = await Feedback.find({ createdAt: { $gte: sevenDaysAgo }, isTrashed: false })
     .sort({ createdAt: -1 })
     .limit(50);
 

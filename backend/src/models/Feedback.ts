@@ -10,6 +10,7 @@ export type FeedbackDocument = HydratedDocument<{
   description: string;
   category: string;
   status: string;
+  submittedByEmail?: string;
   submitterName?: string;
   submitterEmail?: string;
   ai_category?: string;
@@ -19,6 +20,8 @@ export type FeedbackDocument = HydratedDocument<{
   ai_tags: string[];
   ai_processed: boolean;
   ai_error?: string;
+  isTrashed: boolean;
+  trashedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }>;
@@ -46,6 +49,11 @@ const feedbackSchema = new mongoose.Schema(
       type: String,
       enum: feedbackStatuses,
       default: "New"
+    },
+    submittedByEmail: {
+      type: String,
+      trim: true,
+      lowercase: true
     },
     submitterName: {
       type: String,
@@ -86,6 +94,13 @@ const feedbackSchema = new mongoose.Schema(
     },
     ai_error: {
       type: String
+    },
+    isTrashed: {
+      type: Boolean,
+      default: false
+    },
+    trashedAt: {
+      type: Date
     }
   },
   {

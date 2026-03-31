@@ -56,12 +56,23 @@ export function FeedbackForm() {
     setMessage(null);
 
     try {
+      const raw = window.localStorage.getItem("feedpulse-user");
+      const user = raw ? (JSON.parse(raw) as { name?: string; email?: string }) : null;
+
       await apiRequest("/feedback", {
         method: "POST",
-        body: form
+        body: {
+          ...form,
+          submittedByEmail: user?.email ?? ""
+        }
       });
-      setForm(initialState);
+      setForm({
+        ...initialState,
+        submitterName: user?.name ?? "",
+        submitterEmail: user?.email ?? ""
+      });
       setMessage({ type: "success", text: "Feedback submitted. The product team can review it now." });
+      window.dispatchEvent(new CustomEvent("feedpulse:feedback-submitted"));
     } catch (error) {
       setMessage({
         type: "error",
