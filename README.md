@@ -45,6 +45,10 @@ PORT=4000
 MONGO_URI=mongodb://localhost:27017/feedpulse
 JWT_SECRET=change-me
 GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_FALLBACK_MODEL=gemini-1.5-flash
+GEMINI_RETRY_COUNT=2
+GEMINI_RETRY_BASE_DELAY_MS=1000
 FRONTEND_URL=http://localhost:3000
 ADMIN_EMAIL=admin@feedpulse.local
 ADMIN_PASSWORD=feedpulse-admin
@@ -99,6 +103,7 @@ Notes:
 - The backend connects to MongoDB through `mongodb://mongo:27017/feedpulse`.
 - The frontend talks to the backend through the Compose service name during build and resolves to `localhost` in the browser automatically.
 - A real Google AI Studio Gemini key is required for AI analysis and the `Re-run AI` action to work.
+- Gemini requests now retry automatically on transient `429` and `503` provider errors, then fall back to `GEMINI_FALLBACK_MODEL` if configured.
 - SMTP values are optional unless you want email verification working inside Docker too.
 
 ## Admin login
@@ -121,9 +126,21 @@ These can be changed in `backend/.env`.
 ## Screenshots
 
 Add at least two screenshots here before submission:
+### Public submission page
+
+![Public submission page](backend/img/submission.png)
+
+### Admin dashboard
+
+![Admin dashboard](backend/img/adnib%20dashboard.png)
 
 - Public submission page
+### Feedback management
+
 - Admin dashboard
+![Feedback management](backend/img/admin_feedback.png)
+
+
 
 ## What I would build next
 

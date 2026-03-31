@@ -15,6 +15,10 @@ type AiAnalysis = {
   tags: string[];
 };
 
+type GenerateJsonOptions = {
+  fallbackToSecondaryModel?: boolean;
+};
+
 let genAI: GoogleGenerativeAI | null = null;
 
 const getClient = () => {
@@ -50,18 +54,82 @@ const normalizeSentiment = (value: unknown): FeedbackSentiment => {
     : "Neutral";
 };
 
-export const analyzeFeedback = async (title: string, description: string): Promise<AiAnalysis> => {
+const sleep = async (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+const isRetryableGeminiError = (error: unknown) => {
+  const message = getErrorMessage(error).toLowerCase();
+
+  return (
+    message.includes("503") ||
+    message.includes("service unavailable") ||
+    message.includes("high demand") ||
+    message.includes("temporar") ||
+    message.includes("overloaded") ||
+    message.includes("timeout") ||
+    message.includes("429") ||
+    message.includes("rate limit")
+  );
+};
+
+const buildModelCandidates = (fallbackToSecondaryModel: boolean) => {
+  const models = [env.geminiModel];
+
+  if (fallbackToSecondaryModel && env.geminiFallbackModel && env.geminiFallbackModel !== env.geminiModel) {
+    models.push(env.geminiFallbackModel);
+  }
+
+  return models;
+};
+
+const generateJson = async (
+  prompt: string,
+  options: GenerateJsonOptions = {}
+) => {
   const client = getClient();
   if (!client) {
     throw new Error("Gemini API key is not configured");
   }
 
-  const model = client.getGenerativeModel({
-    model: env.geminiModel,
-    generationConfig: {
-      responseMimeType: "application/json"
+  const models = buildModelCandidates(options.fallbackToSecondaryModel ?? true);
+  let lastError: unknown;
+
+  for (const modelName of models) {
+    const model = client.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    for (let attempt = 0; attempt <= env.geminiRetryCount; attempt += 1) {
+      try {
+        const result = await model.generateContent(prompt);
+        return extractJsonObject(result.response.text());
+      } catch (error) {
+        lastError = error;
+        const canRetry = isRetryableGeminiError(error);
+        const hasAnotherAttempt = attempt < env.geminiRetryCount;
+
+        if (!canRetry || !hasAnotherAttempt) {
+          break;
+        }
+
+        await sleep(env.geminiRetryBaseDelayMs * 2 ** attempt);
+      }
     }
-  });
+  }
+
+  throw new Error(
+    `Gemini request failed after retries${models.length > 1 ? ` across models (${models.join(", ")})` : ""}: ${getErrorMessage(lastError)}`
+  );
+};
+
+export const analyzeFeedback = async (title: string, description: string): Promise<AiAnalysis> => {
   const prompt = [
     "Analyse this product feedback.",
     "Return ONLY valid JSON with these fields: category, sentiment, priority_score, summary, tags.",
@@ -69,8 +137,7 @@ export const analyzeFeedback = async (title: string, description: string): Promi
     `Description: ${description}`
   ].join("\n");
 
-  const result = await model.generateContent(prompt);
-  const parsed = extractJsonObject(result.response.text());
+  const parsed = await generateJson(prompt);
 
   return {
     category: normalizeCategory(parsed.category),
@@ -90,25 +157,13 @@ export const analyzeFeedback = async (title: string, description: string): Promi
 export const summarizeThemes = async (
   items: Array<{ title: string; description: string; summary?: string }>
 ) => {
-  const client = getClient();
-  if (!client) {
-    throw new Error("Gemini API key is not configured");
-  }
-
-  const model = client.getGenerativeModel({
-    model: env.geminiModel,
-    generationConfig: {
-      responseMimeType: "application/json"
-    }
-  });
   const prompt = [
     "Summarize recent product feedback.",
     "Return ONLY valid JSON with a `themes` array containing exactly 3 short strings.",
     JSON.stringify(items)
   ].join("\n");
 
-  const result = await model.generateContent(prompt);
-  const parsed = extractJsonObject(result.response.text());
+  const parsed = await generateJson(prompt);
 
   return Array.isArray(parsed.themes)
     ? parsed.themes.filter((theme): theme is string => typeof theme === "string").slice(0, 3)
