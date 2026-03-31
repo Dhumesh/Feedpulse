@@ -1,0 +1,474 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { apiRequest } from "../lib/api";
+
+type FeedbackItem = {
+  id: string;
+  title: string;
+  category: string;
+  status: string;
+  ai_sentiment: string;
+  ai_priority: number | null;
+  ai_summary: string;
+  ai_tags: string[];
+  createdAt: string;
+};
+
+type DashboardPayload = {
+  items: FeedbackItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  stats: {
+    totalFeedback: number;
+    openItems: number;
+    averagePriority: number;
+    mostCommonTag: string;
+  };
+};
+
+type SummaryPayload = {
+  themes: string[];
+};
+
+const statusOptions = ["New", "In Review", "Resolved"];
+const categoryOptions = ["All", "Bug", "Feature Request", "Improvement", "Other"];
+const statusFilterOptions = ["All", "New", "In Review", "Resolved"];
+const sortOptions = [
+  { label: "Newest first", value: "date" },
+  { label: "Priority", value: "priority" },
+  { label: "Sentiment", value: "sentiment" }
+];
+const tokenKey = "feedpulse-admin-token";
+
+function sentimentClass(value: string) {
+  const lower = value.toLowerCase();
+
+  if (lower === "positive" || lower === "negative" || lower === "neutral") {
+    return `sentiment-chip sentiment-${lower}`;
+  }
+
+  return "sentiment-chip sentiment-neutral";
+}
+
+function categoryClass(value: string) {
+  if (value === "Feature Request") {
+    return "tag feature";
+  }
+
+  if (value === "Improvement") {
+    return "tag improvement";
+  }
+
+  if (value === "Bug") {
+    return "tag bug";
+  }
+
+  return "tag other";
+}
+
+function statusClass(value: string) {
+  if (value === "Resolved") {
+    return "status-select resolved";
+  }
+
+  if (value === "In Review") {
+    return "status-select review";
+  }
+
+  return "status-select new";
+}
+
+function priorityStars(value: number | null) {
+  const score = Math.max(0, Math.min(5, Math.round((value ?? 0) / 2)));
+  return "*".repeat(score) + ".".repeat(5 - score);
+}
+
+export function AdminDashboard() {
+  const [token, setToken] = useState("");
+  const [loginForm, setLoginForm] = useState({
+    email: "admin@feedpulse.local",
+    password: "feedpulse-admin"
+  });
+  const [filters, setFilters] = useState({
+    category: "All",
+    status: "All",
+    search: "",
+    sortBy: "date",
+    page: 1
+  });
+  const [data, setData] = useState<DashboardPayload | null>(null);
+  const [themes, setThemes] = useState<string[]>([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const storedToken = window.localStorage.getItem(tokenKey) ?? "";
+    setToken(storedToken);
+  }, []);
+
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(filters.page),
+      limit: "10",
+      sortBy: filters.sortBy
+    });
+
+    if (filters.category !== "All") {
+      params.set("category", filters.category);
+    }
+
+    if (filters.status !== "All") {
+      params.set("status", filters.status);
+    }
+
+    if (filters.search.trim()) {
+      params.set("search", filters.search.trim());
+    }
+
+    return params.toString();
+  }, [filters]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    const run = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const [feedbackResponse, summaryResponse] = await Promise.all([
+          apiRequest<DashboardPayload>(`/feedback?${queryString}`, { token }),
+          apiRequest<SummaryPayload>("/feedback/summary", { token })
+        ]);
+
+        setData(feedbackResponse.data);
+        setThemes(summaryResponse.data.themes ?? []);
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : "Could not load dashboard");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void run();
+  }, [queryString, token]);
+
+  const login = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+
+    try {
+      const response = await apiRequest<{ token: string }>("/auth/login", {
+        method: "POST",
+        body: loginForm
+      });
+      window.localStorage.setItem(tokenKey, response.data.token);
+      setToken(response.data.token);
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : "Login failed");
+    }
+  };
+
+  const updateStatus = async (id: string, status: string) => {
+    if (!token) {
+      return;
+    }
+
+    try {
+      await apiRequest(`/feedback/${id}`, {
+        method: "PATCH",
+        token,
+        body: { status }
+      });
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((item) => (item.id === id ? { ...item, status } : item))
+            }
+          : current
+      );
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Status update failed");
+    }
+  };
+
+  const logout = () => {
+    window.localStorage.removeItem(tokenKey);
+    setToken("");
+    setData(null);
+  };
+
+  if (!token) {
+    return (
+      <section className="panel dashboard-login">
+        <div className="section-heading">
+          <span className="pill">Protected dashboard</span>
+          <h2>Admin login</h2>
+          <p>Use the hardcoded admin credentials configured in the backend.</p>
+        </div>
+
+        <form onSubmit={login} className="login-grid">
+          <label>
+            Email
+            <input
+              type="email"
+              value={loginForm.email}
+              onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
+            />
+          </label>
+
+          <label>
+            Password
+            <input
+              type="password"
+              value={loginForm.password}
+              onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
+            />
+          </label>
+
+          {error ? <p className="notice error">{error}</p> : null}
+
+          <button type="submit">Enter dashboard</button>
+        </form>
+      </section>
+    );
+  }
+
+  return (
+    <section className="dashboard-shell">
+      <aside className="dashboard-sidebar">
+        <div className="brand-block">
+          <div className="brand-mark">P</div>
+          <div>
+            <strong>FeedPulse</strong>
+            <span>AI CURATOR</span>
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
+          <span className="sidebar-link active">Dashboard</span>
+          <span className="sidebar-link">Feedback</span>
+          <span className="sidebar-link">Settings</span>
+        </nav>
+
+        <button className="sidebar-logout" onClick={logout}>
+          Logout
+        </button>
+      </aside>
+
+      <div className="dashboard-content">
+        <header className="admin-header">
+          <div>
+            <h1>Admin Insights</h1>
+            <p>Real-time pulse of customer sentiment and feedback items.</p>
+          </div>
+
+          <div className="admin-toolbar">
+            <label className="search-box">
+              <span>Search</span>
+              <input
+                value={filters.search}
+                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value, page: 1 }))}
+                placeholder="Search insights..."
+              />
+            </label>
+            <div className="avatar-dot">A</div>
+          </div>
+        </header>
+
+        <section className="admin-stats">
+          <article className="metric-card">
+            <span className="metric-badge cool">+ live</span>
+            <p>Total feedback</p>
+            <strong>{data?.stats.totalFeedback ?? 0}</strong>
+          </article>
+          <article className="metric-card">
+            <span className="metric-badge warm">Active</span>
+            <p>Open items</p>
+            <strong>{data?.stats.openItems ?? 0}</strong>
+          </article>
+          <article className="metric-card">
+            <span className="metric-badge muted">High</span>
+            <p>Avg priority</p>
+            <strong>{data?.stats.averagePriority ?? 0}</strong>
+          </article>
+          <article className="metric-card">
+            <span className="metric-badge soft">Top</span>
+            <p>Top tag</p>
+            <strong>{data?.stats.mostCommonTag ?? "N/A"}</strong>
+          </article>
+        </section>
+
+        <section className="filter-bar">
+          <div className="filter-row">
+            <label className="filter-chip">
+              <span>Category</span>
+              <select
+                value={filters.category}
+                onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value, page: 1 }))}
+              >
+                {categoryOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="filter-chip">
+              <span>Status</span>
+              <select
+                value={filters.status}
+                onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value, page: 1 }))}
+              >
+                {statusFilterOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="filter-chip">
+              <span>Sort</span>
+              <select
+                value={filters.sortBy}
+                onChange={(event) => setFilters((current) => ({ ...current, sortBy: event.target.value }))}
+              >
+                {sortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <button className="export-button" type="button">
+            Export Report
+          </button>
+        </section>
+
+        {error ? <p className="notice error">{error}</p> : null}
+        {loading ? <p className="notice">Loading feedback...</p> : null}
+
+        <section className="table-card">
+          <div className="table-scroll">
+            <table className="insight-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Sentiment</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data?.items.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <strong>{item.title}</strong>
+                      <span>{item.ai_summary || "AI summary not available yet."}</span>
+                    </td>
+                    <td>
+                      <span className={categoryClass(item.category)}>{item.category}</span>
+                    </td>
+                    <td>
+                      <span className={sentimentClass(item.ai_sentiment || "Neutral")}>
+                        {item.ai_sentiment || "Pending AI"}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="priority-stars">{priorityStars(item.ai_priority)}</span>
+                    </td>
+                    <td>
+                      <select
+                        className={statusClass(item.status)}
+                        value={item.status}
+                        onChange={(event) => updateStatus(item.id, event.target.value)}
+                      >
+                        {statusOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>{new Date(item.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <footer className="table-footer">
+            <p>
+              Showing {data?.items.length ?? 0} of {data?.pagination.total ?? 0} items
+            </p>
+            <div className="pager">
+              <button
+                disabled={(data?.pagination.page ?? 1) <= 1}
+                onClick={() => setFilters((current) => ({ ...current, page: Math.max(1, current.page - 1) }))}
+              >
+                Prev
+              </button>
+              <span className="page-indicator">{data?.pagination.page ?? 1}</span>
+              <button
+                disabled={(data?.pagination.page ?? 1) >= (data?.pagination.totalPages ?? 1)}
+                onClick={() =>
+                  setFilters((current) => ({
+                    ...current,
+                    page: Math.min(data?.pagination.totalPages ?? current.page, current.page + 1)
+                  }))
+                }
+              >
+                Next
+              </button>
+            </div>
+          </footer>
+        </section>
+
+        <section className="summary-grid">
+          <article className="summary-hero">
+            <p className="summary-kicker">AI Summary</p>
+            <h2>Critical product themes from the last 7 days</h2>
+            <div className="theme-list">
+              {themes.length ? (
+                themes.map((theme) => (
+                  <span key={theme} className="summary-theme">
+                    {theme}
+                  </span>
+                ))
+              ) : (
+                <span className="summary-theme">No summary available yet.</span>
+              )}
+            </div>
+          </article>
+
+          <article className="quick-actions">
+            <h3>Quick Actions</h3>
+            <button className="quick-action" type="button">
+              Review pending items
+            </button>
+            <button className="quick-action" type="button">
+              Assign high priority
+            </button>
+            <button className="quick-action" type="button">
+              Sync to Jira/Linear
+            </button>
+          </article>
+        </section>
+      </div>
+    </section>
+  );
+}
