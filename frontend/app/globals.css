@@ -85,6 +85,44 @@ button {
   padding: 24px 0 48px;
 }
 
+.landing-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.brand-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-headline), sans-serif;
+  color: var(--primary);
+}
+
+.brand-mark.small {
+  width: 34px;
+  height: 34px;
+  font-size: 0.9rem;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 14px;
+  border-radius: 16px;
+  background: var(--surface-low);
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .landing-hero {
   min-height: 72vh;
   display: grid;
@@ -260,6 +298,41 @@ textarea {
 
 .notice.error {
   background: rgba(210, 70, 70, 0.12);
+}
+
+.auth-panel {
+  max-width: 640px;
+  margin: 48px auto 0;
+  padding: 28px;
+}
+
+.auth-tabs {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  background: var(--surface-low);
+  border-radius: 18px;
+  margin-bottom: 20px;
+}
+
+.auth-tab {
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 18px;
+}
+
+.auth-tab.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+  color: white;
+}
+
+.auth-form {
+  padding: 0;
+}
+
+.auth-help {
+  margin-top: 16px;
+  color: var(--muted);
 }
 
 .dashboard-shell {
@@ -650,6 +723,12 @@ textarea {
   .filter-bar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .landing-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
   }
 
   .search-box {

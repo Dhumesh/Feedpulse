@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "../lib/api";
 
 const categories = ["Bug", "Feature Request", "Improvement", "Other"];
@@ -24,6 +24,25 @@ export function FeedbackForm() {
     () => form.title.trim().length > 0 && descriptionCount >= minDescription,
     [descriptionCount, form.title]
   );
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem("feedpulse-user");
+
+    if (!raw) {
+      return;
+    }
+
+    try {
+      const user = JSON.parse(raw) as { name?: string; email?: string };
+      setForm((current) => ({
+        ...current,
+        submitterName: current.submitterName || user.name || "",
+        submitterEmail: current.submitterEmail || user.email || ""
+      }));
+    } catch {
+      window.localStorage.removeItem("feedpulse-user");
+    }
+  }, []);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

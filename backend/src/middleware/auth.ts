@@ -5,7 +5,7 @@ import { createResponse } from "../utils/api";
 
 type AuthPayload = {
   email: string;
-  role: "admin";
+  role: "admin" | "user";
 };
 
 export type AuthenticatedRequest = Request & {
@@ -27,6 +27,10 @@ export const requireAdmin = (
 
   try {
     const payload = jwt.verify(token, env.jwtSecret) as AuthPayload;
+    if (payload.role !== "admin") {
+      res.status(401).json(createResponse(false, null, "Admin access required", "UNAUTHORIZED"));
+      return;
+    }
     req.user = payload;
     next();
   } catch {

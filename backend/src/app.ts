@@ -1,5 +1,7 @@
 import cors from "cors";
 import express from "express";
+import swaggerUi from "swagger-ui-express";
+import { openApiSpec } from "../docs/openapi";
 import { env } from "./config/env";
 import authRoutes from "./routes/auth.routes";
 import feedbackRoutes from "./routes/feedback.routes";
@@ -22,6 +24,12 @@ app.get("/api/health", (_req, res) => {
     message: "FeedPulse backend is healthy"
   });
 });
+
+app.get("/api/openapi.json", (_req, res) => {
+  res.status(200).json(openApiSpec);
+});
+
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/feedback", feedbackRoutes);
